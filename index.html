@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>欢乐斗地主</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ① 开始界面 -->
+  <div id="startScreen" class="screen active">
+    <!-- 粒子背景 -->
+    <canvas id="particleCanvas" class="particle-canvas"></canvas>
+
+    <!-- 顶部装饰光效 -->
+    <div class="start-glow start-glow-l"></div>
+    <div class="start-glow start-glow-r"></div>
+
+    <!-- Logo区 -->
+    <div class="logo-area">
+      <div class="logo-cards">
+        <div class="logo-card lc1">♠</div>
+        <div class="logo-card lc2">♥</div>
+        <div class="logo-card lc3">♦</div>
+        <div class="logo-card lc4">♣</div>
+      </div>
+      <h1 class="logo-title">
+        <span class="lt-dou">斗</span><span class="lt-di">地</span><span class="lt-zhu">主</span>
+      </h1>
+      <div class="logo-badge">Q版欢乐版</div>
+    </div>
+
+    <!-- 昵称输入 -->
+    <div class="name-input-wrap">
+      <div class="name-input-icon">🐼</div>
+      <input id="playerNameInput" class="name-input" type="text" maxlength="8" placeholder="输入昵称..." value="小熊猫" />
+    </div>
+
+    <!-- 主按钮 -->
+    <div class="start-btns">
+      <button class="btn btn-quick" id="quickStartBtn">
+        <span class="btn-icon-l">⚡</span>
+        <span>快速开始</span>
+        <span class="btn-shine"></span>
+      </button>
+      <button class="btn btn-multi" id="multiBtn">
+        <span class="btn-icon-l">🌐</span>
+        <span>多人对战</span>
+        <span class="btn-shine"></span>
+      </button>
+    </div>
+    <button class="btn btn-rule" id="ruleBtn">📖 游戏规则</button>
+
+    <!-- 底部装饰牌 -->
+    <div class="deco-row">
+      <div class="deco-card dc1">♠A</div>
+      <div class="deco-card dc2">♥K</div>
+      <div class="deco-card dc3">🃏</div>
+      <div class="deco-card dc4">♦Q</div>
+      <div class="deco-card dc5">♣J</div>
+    </div>
+
+    <!-- 版本号 -->
+    <div class="version-tag">v2.0 欢乐版</div>
+  </div>
+
+  <!-- ② 规则界面 -->
+  <div id="ruleScreen" class="screen">
+    <div class="rule-box">
+      <div class="rule-header">
+        <h2>游戏规则</h2>
+        <button class="btn-close" id="backFromRuleBtn">✕</button>
+      </div>
+      <div class="rule-content">
+        <div class="rule-section">
+          <div class="rule-section-title">🎮 基本规则</div>
+          <p>三人游戏，其中一人叫地主，另外两人为农民合作对抗地主。</p>
+        </div>
+        <div class="rule-section">
+          <div class="rule-section-title">🃏 牌型说明</div>
+          <div class="rule-cards-grid">
+            <div class="rule-card-item"><span class="rc-name">单张</span><span class="rc-eg">任意一张</span></div>
+            <div class="rule-card-item"><span class="rc-name">对子</span><span class="rc-eg">两张相同</span></div>
+            <div class="rule-card-item"><span class="rc-name">三张</span><span class="rc-eg">三张相同</span></div>
+            <div class="rule-card-item"><span class="rc-name">三带一</span><span class="rc-eg">三张+一张</span></div>
+            <div class="rule-card-item"><span class="rc-name">三带二</span><span class="rc-eg">三张+一对</span></div>
+            <div class="rule-card-item"><span class="rc-name">顺子</span><span class="rc-eg">5张以上连续</span></div>
+            <div class="rule-card-item"><span class="rc-name">连对</span><span class="rc-eg">3对以上连续</span></div>
+            <div class="rule-card-item"><span class="rc-name">飞机</span><span class="rc-eg">两组以上三张</span></div>
+            <div class="rule-card-item bomb-item"><span class="rc-name">💣炸弹</span><span class="rc-eg">四张相同</span></div>
+            <div class="rule-card-item rocket-item"><span class="rc-name">🚀王炸</span><span class="rc-eg">大王+小王</span></div>
+          </div>
+        </div>
+        <div class="rule-section">
+          <div class="rule-section-title">🏆 胜利条件</div>
+          <p>率先出完手牌的一方获胜。地主独胜或农民联合胜均可。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 多人大厅 -->
+  <div id="lobbyScreen" class="screen">
+    <div class="lobby-wrap">
+      <div class="lobby-header">
+        <button class="btn-back-nav" id="backFromLobbyBtn">‹ 返回</button>
+        <h2 class="lobby-title">🌐 多人大厅</h2>
+        <button class="btn-create-room" id="createRoomBtn">＋ 创建房间</button>
+      </div>
+      <div class="lobby-body">
+        <div class="room-list-header">
+          <span class="rl-title">房间列表</span>
+          <button class="btn-refresh" id="refreshRoomsBtn">↻ 刷新</button>
+        </div>
+        <div class="room-list" id="roomList">
+          <div class="room-empty">暂无房间，点击"创建房间"开局！</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ 房间等待室 -->
+  <div id="roomScreen" class="screen">
+    <div class="room-wrap">
+      <div class="room-header">
+        <button class="btn-back-nav" id="backFromRoomBtn">‹ 离开</button>
+        <h2 class="room-title" id="roomTitle">房间</h2>
+        <div class="room-id-badge">房间号: <span id="roomIdDisplay">——</span></div>
+      </div>
+      <div class="seats-area">
+        <div class="seat" id="seat0">
+          <div class="seat-avatar" id="seat0Avatar">🐼</div>
+          <div class="seat-name" id="seat0Name">空位</div>
+          <div class="seat-tag" id="seat0Tag"></div>
+          <div class="seat-btns" id="seat0Btns"></div>
+        </div>
+        <div class="seat-vs-wrap"><div class="seat-vs">VS</div></div>
+        <div class="seat" id="seat1">
+          <div class="seat-avatar" id="seat1Avatar">❓</div>
+          <div class="seat-name" id="seat1Name">空位</div>
+          <div class="seat-tag" id="seat1Tag"></div>
+          <div class="seat-btns" id="seat1Btns"></div>
+        </div>
+        <div class="seat-vs-wrap"><div class="seat-vs">VS</div></div>
+        <div class="seat" id="seat2">
+          <div class="seat-avatar" id="seat2Avatar">❓</div>
+          <div class="seat-name" id="seat2Name">空位</div>
+          <div class="seat-tag" id="seat2Tag"></div>
+          <div class="seat-btns" id="seat2Btns"></div>
+        </div>
+      </div>
+      <div class="room-actions">
+        <div class="room-tip" id="roomTip">等待玩家加入...</div>
+        <button class="btn btn-ready" id="readyBtn">✅ 准备</button>
+        <button class="btn btn-start-game" id="startGameFromRoomBtn" style="display:none">🚀 开始游戏</button>
+      </div>
+      <div class="room-chat">
+        <div class="chat-log" id="chatLog"></div>
+        <div class="chat-input-row">
+          <input id="chatInput" class="chat-input" type="text" maxlength="30" placeholder="说点什么..." />
+          <button class="btn-chat-send" id="chatSendBtn">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ 游戏主界面 -->
+  <div id="gameScreen" class="screen">
+    <!-- 桌面纹理背景 -->
+    <div class="table-felt"></div>
+    <div class="table-border"></div>
+
+    <!-- 顶部信息栏 -->
+    <div class="top-bar">
+      <div class="score-group">
+        <div class="score-item">
+          <span class="si-label">底分</span>
+          <span class="si-val" id="baseScore">1</span>
+        </div>
+        <div class="score-sep">×</div>
+        <div class="score-item">
+          <span class="si-label">倍数</span>
+          <span class="si-val highlight" id="multiplier">1</span>
+        </div>
+        <div class="score-sep">=</div>
+        <div class="score-item">
+          <span class="si-label">积分</span>
+          <span class="si-val gold" id="totalScore">0</span>
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <button class="btn-icon-round" id="muteBtn" title="静音">🔊</button>
+        <button class="btn-quit" id="quitBtn">退出</button>
+      </div>
+    </div>
+
+    <!-- 左侧玩家 -->
+    <div class="player-area player-left" id="leftPlayer">
+      <div class="player-card-wrap" id="leftCards"></div>
+      <div class="player-info-wrap">
+        <div class="player-avatar-box">
+          <div class="avatar-emoji" id="leftAvatar">🐱</div>
+          <div class="player-role-badge" id="leftRole"></div>
+        </div>
+        <div class="player-meta">
+          <div class="player-name-tag" id="leftName">猫咪</div>
+          <div class="player-card-count" id="leftCardCount">17张</div>
+        </div>
+      </div>
+      <div class="played-area" id="leftPlayed"></div>
+      <div class="think-bubble" id="leftThink"></div>
+      <div class="turn-glow left-glow" id="leftGlow"></div>
+    </div>
+
+    <!-- 右侧玩家 -->
+    <div class="player-area player-right" id="rightPlayer">
+      <div class="player-card-wrap" id="rightCards"></div>
+      <div class="player-info-wrap">
+        <div class="player-avatar-box">
+          <div class="avatar-emoji" id="rightAvatar">🐶</div>
+          <div class="player-role-badge" id="rightRole"></div>
+        </div>
+        <div class="player-meta">
+          <div class="player-name-tag" id="rightName">狗狗</div>
+          <div class="player-card-count" id="rightCardCount">17张</div>
+        </div>
+      </div>
+      <div class="played-area" id="rightPlayed"></div>
+      <div class="think-bubble" id="rightThink"></div>
+      <div class="turn-glow right-glow" id="rightGlow"></div>
+    </div>
+
+    <!-- 中央区域 -->
+    <div class="center-area">
+      <!-- 底牌 -->
+      <div class="landlord-zone" id="landlordCardsArea">
+        <div class="landlord-crown">👑 底牌</div>
+        <div class="landlord-cards" id="landlordCards"></div>
+      </div>
+
+      <!-- 叫地主面板 -->
+      <div class="bid-panel" id="bidArea" style="display:none">
+        <div class="bid-question">要叫地主吗？</div>
+        <div class="bid-btns">
+          <button class="btn btn-bid-yes" id="bidYes">
+            <span>叫地主</span>
+            <span class="bid-score">+底分</span>
+          </button>
+          <button class="btn btn-bid-no" id="bidNo">不叫</button>
+        </div>
+      </div>
+
+      <!-- 抢地主面板 -->
+      <div class="bid-panel" id="robArea" style="display:none">
+        <div class="bid-question">要抢地主吗？</div>
+        <div class="bid-btns">
+          <button class="btn btn-bid-yes" id="robYes">
+            <span>抢地主</span>
+            <span class="bid-score">×2</span>
+          </button>
+          <button class="btn btn-bid-no" id="robNo">不抢</button>
+        </div>
+      </div>
+
+      <!-- 最后出牌展示 -->
+      <div class="last-play-wrap">
+        <div class="last-played-cards" id="centerPlayed"></div>
+        <div class="last-played-info" id="centerPlayedWho"></div>
+      </div>
+    </div>
+
+    <!-- 底部玩家 -->
+    <div class="player-area player-bottom" id="bottomPlayer">
+      <!-- 当前轮高亮横条 -->
+      <div class="bottom-active-bar" id="bottomActiveBar"></div>
+
+      <div class="bottom-info-row">
+        <div class="player-avatar-box bottom-avatar">
+          <div class="avatar-emoji" id="bottomAvatar">🐼</div>
+          <div class="player-role-badge" id="bottomRole"></div>
+        </div>
+        <div class="player-name-tag" id="bottomName">我</div>
+        <div class="player-card-count" id="bottomCardCount">17张</div>
+      </div>
+
+      <!-- 手牌 -->
+      <div class="hand-cards-row" id="bottomCards"></div>
+
+      <!-- 操作按钮 -->
+      <div class="action-btns" id="actionBtns" style="display:none">
+        <button class="btn btn-pass" id="passBtn">
+          <span class="ab-icon">✋</span>不出
+        </button>
+        <button class="btn btn-play" id="playBtn">
+          <span class="ab-icon">🃏</span>出牌
+        </button>
+        <button class="btn btn-hint" id="hintBtn">
+          <span class="ab-icon">💡</span>提示
+        </button>
+      </div>
+    </div>
+
+    <!-- 倒计时 -->
+    <div class="timer-wrap" id="timerBarWrap" style="display:none">
+      <svg class="timer-svg" viewBox="0 0 60 60" id="timerSvg">
+        <circle class="timer-bg" cx="30" cy="30" r="26"/>
+        <circle class="timer-fg" cx="30" cy="30" r="26" id="timerCircle"/>
+      </svg>
+      <div class="timer-num" id="timerText">20</div>
+    </div>
+
+    <!-- 轮次提示浮层 -->
+    <div class="turn-toast" id="turnTip"></div>
+
+    <!-- 炸弹特效层 -->
+    <div class="bomb-overlay" id="bombOverlay"></div>
+    <!-- 赢牌特效 -->
+    <canvas class="confetti-canvas" id="confettiCanvas"></canvas>
+  </div>
+
+  <!-- ⑥ 结算界面 -->
+  <div id="resultScreen" class="screen">
+    <div class="result-bg-overlay"></div>
+    <div class="result-box">
+      <div class="result-ribbon" id="resultRibbon"></div>
+      <div class="result-icon" id="resultIcon"></div>
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-score-wrap">
+        <div class="result-score-label">本局得分</div>
+        <div class="result-score-val" id="resultScore">+0</div>
+      </div>
+      <div class="result-detail" id="resultDetail"></div>
+
+      <!-- 各家手牌 -->
+      <div class="result-reveal">
+        <div class="rr-title">各家手牌</div>
+        <div class="rr-hands" id="revealHands"></div>
+      </div>
+
+      <div class="result-btns">
+        <button class="btn btn-play-again" id="playAgainBtn">
+          <span>🔄 再来一局</span>
+          <span class="btn-shine"></span>
+        </button>
+        <button class="btn btn-home" id="backHomeBtn">🏠 返回首页</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="sound.js"></script>
+  <script src="network.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
