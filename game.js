@@ -768,8 +768,8 @@ function showActionBtns(show) {
 function doAITurn(pi) {
   const lastForAI = G.lastPlay && G.lastPlay.playerIndex!==pi ? G.lastPlay : null;
   const play = aiPlay(pi, lastForAI);
-  // AI语音
-  SFX.aiPlayVoice(!play);
+  // AI语音（传入牌型，让语音更精准）
+  SFX.aiPlayVoice(!play, play ? play.type : null);
   executePlay(pi, play);
 }
 
@@ -788,9 +788,15 @@ function executePlay(pi, play) {
     G.lastPlay = { ...play, playerIndex: pi };
 
     // 音效
-    if (play.type==='rocket') { SFX.rocket(); triggerBombEffect(true); }
-    else if (play.type==='bomb') { SFX.bomb(); triggerBombEffect(false); }
-    else SFX.playCard();
+    if (play.type==='rocket') {
+      SFX.rocket(); triggerBombEffect(true);
+    } else if (play.type==='bomb') {
+      SFX.bomb(); triggerBombEffect(false);
+    } else {
+      SFX.playCard();
+      // 玩家出牌时播报牌型语音
+      if (pi === 0) SFX.playCardVoice(play.type);
+    }
 
     // 侧边展示
     if (pi!==0) {
