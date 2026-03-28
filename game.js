@@ -43,6 +43,7 @@ let bidQueue = [];
 let robQueue = [];
 let turnTimer = null;
 let turnTimerCount = 0;
+let autoPlay = false; // 托管模式
 
 // ─── 建牌/洗牌 ────────────────────────────────────────────
 function buildDeck() {
@@ -129,35 +130,120 @@ function canBeat(np, lp) {
   return np.val > lp.val;
 }
 
-// ─── AI 逻辑 ──────────────────────────────────────────────
+// ─── AI 逻辑（优化版）───────────────────────────────────
 function aiPlay(playerIdx, lastPlay) {
   const hand = G.players[playerIdx].cards;
   const isMust = !lastPlay || lastPlay.playerIndex === playerIdx;
   const allCombos = getAllCombos(hand);
+  const isLandlord = G.landlordIndex === playerIdx;
+  const handLen = hand.length;
 
+  // 判断队友关系
+  function isAlly(otherIdx) {
+    if (isLandlord) return false;
+    return G.landlordIndex !== otherIdx;
+  }
+
+  // 跟牌逻辑
   if (!isMust) {
     const valid = allCombos.filter(c => canBeat(c, lastPlay));
     if (!valid.length) return null;
-    const isAlly = (G.landlordIndex!==playerIdx) && (G.landlordIndex!==lastPlay.playerIndex);
-    if (isAlly) return null;
-    valid.sort((a,b) => {
-      if (a.type==='bomb' && b.type!=='bomb') return 1;
-      if (b.type==='bomb' && a.type!=='bomb') return -1;
+
+    const lastPlayerIdx = lastPlay.playerIndex;
+    const allyPlayed = isAlly(lastPlayerIdx);
+
+    // 如果是队友出的牌，一般不压（除非自己只剩几张牌能赢）
+    if (allyPlayed && handLen > 3) return null;
+
+    // 排序：优先出小牌，保留炸弹
+    valid.sort((a, b) => {
+      const aIsBomb = a.type === 'bomb' || a.type === 'rocket';
+      const bIsBomb = b.type === 'bomb' || b.type === 'rocket';
+      if (aIsBomb && !bIsBomb) return 1;
+      if (!aIsBomb && bIsBomb) return -1;
       return a.val - b.val;
     });
-    return valid[0];
-  } else {
-    if (!allCombos.length) return null;
-    const seqs    = allCombos.filter(c=>c.type==='sequence').sort((a,b)=>b.len-a.len||a.val-b.val);
-    const triples = allCombos.filter(c=>c.type==='triple'||c.type==='triple1').sort((a,b)=>a.val-b.val);
-    const pairs   = allCombos.filter(c=>c.type==='pair').sort((a,b)=>a.val-b.val);
-    const singles = allCombos.filter(c=>c.type==='single').sort((a,b)=>a.val-b.val);
-    if (seqs.length)    return seqs[0];
-    if (triples.length) return triples[0];
-    if (pairs.length)   return pairs[0];
-    if (singles.length) return singles[0];
-    return allCombos[0];
+
+    // 如果对手只剩1-2张牌，必须压制
+    const opponentLow = G.players.some((p, i) => {
+      if (i === playerIdx || isAlly(i)) return false;
+      return p.cards.length <= 2;
+    });
+
+    // 对手牌少，用炸弹也行
+    if (opponentLow) return valid[0];
+
+    // 普通情况：不轻易出炸弹
+    const nonBomb = valid.filter(c => c.type !== 'bomb' && c.type !== 'rocket');
+    if (nonBomb.length) return nonBomb[0];
+
+    // 只剩炸弹了，手牌少于5张时可以用
+    if (handLen <= 5) return valid[0];
+    return null;
   }
+
+  // 主动出牌逻辑
+  if (!allCombos.length) return null;
+
+  const byVal = {};
+  hand.forEach(c => { (byVal[c.val] = byVal[c.val] || []).push(c); });
+
+  // 分类
+  const seqs     = allCombos.filter(c => c.type === 'sequence').sort((a, b) => b.len - a.len || a.val - b.val);
+  const seqPairs = allCombos.filter(c => c.type === 'seqPair').sort((a, b) => b.len - a.len || a.val - b.val);
+  const planes   = allCombos.filter(c => ['plane', 'plane1', 'plane2'].includes(c.type)).sort((a, b) => b.len - a.len || a.val - b.val);
+  const triples  = allCombos.filter(c => ['triple', 'triple1', 'triple2'].includes(c.type)).sort((a, b) => a.val - b.val);
+  const pairs    = allCombos.filter(c => c.type === 'pair').sort((a, b) => a.val - b.val);
+  const singles  = allCombos.filter(c => c.type === 'single' && c.val < 15).sort((a, b) => a.val - b.val);
+  const bombs    = allCombos.filter(c => c.type === 'bomb' || c.type === 'rocket').sort((a, b) => a.val - b.val);
+
+  // 手牌少于等于5张时：尝试一次性打完
+  if (handLen <= 5) {
+    const wholeHand = getCardType(hand);
+    if (wholeHand) return wholeHand;
+  }
+
+  // 优先级：飞机 > 顺子 > 连对 > 三带 > 对子 > 单张
+  if (planes.length) return planes[0];
+  if (seqs.length) return seqs[0];
+  if (seqPairs.length) return seqPairs[0];
+
+  // 三带策略：优先带出碎牌
+  if (triples.length) {
+    const tv = triples[0].val;
+    const singleKick = singles.find(s => s.val !== tv && s.val < 15);
+    if (singleKick && byVal[tv] && byVal[tv].length >= 3) {
+      const combo = getCardType([...byVal[tv].slice(0, 3), singleKick.cards[0]]);
+      if (combo) return combo;
+    }
+    const pairKick = pairs.find(p => p.val !== tv);
+    if (pairKick && byVal[tv] && byVal[tv].length >= 3) {
+      const combo = getCardType([...byVal[tv].slice(0, 3), ...pairKick.cards]);
+      if (combo) return combo;
+    }
+    return triples[0];
+  }
+
+  // 出对子（不拆三张和炸弹）
+  const safePairs = pairs.filter(p => byVal[p.val] && byVal[p.val].length === 2);
+  if (safePairs.length) return safePairs[0];
+  if (pairs.length) return pairs[0];
+
+  // 出单张（从小到大，避免拆对/三张）
+  const safeSingles = singles.filter(s => byVal[s.val] && byVal[s.val].length === 1);
+  if (safeSingles.length) return safeSingles[0];
+  if (singles.length) return singles[0];
+
+  // 最后才用炸弹（手牌快出完时）
+  if (bombs.length && handLen <= 6) return bombs[0];
+
+  // 兜底
+  const fallback = allCombos.filter(c => c.type !== 'bomb' && c.type !== 'rocket');
+  if (fallback.length) {
+    fallback.sort((a, b) => a.val - b.val);
+    return fallback[0];
+  }
+  return allCombos[0];
 }
 
 function getAllCombos(hand) {
@@ -546,6 +632,11 @@ function initGame(opts = {}) {
   G.multiplier    = 1;
   G.selectedCards = [];
 
+  // 重置托管状态
+  autoPlay = false;
+  const apBtn = document.getElementById('autoPlayBtn');
+  if (apBtn) { apBtn.textContent = '🤖'; apBtn.title = '托管'; apBtn.style.background = ''; }
+
   // 发牌
   for (let i=0;i<51;i++) G.players[i%3].cards.push(G.deck[i]);
   G.landlordCards = G.deck.slice(51, 54);
@@ -555,6 +646,7 @@ function initGame(opts = {}) {
   renderAICards();
   renderPlayerCards();
   renderLandlordCards(false);
+  document.getElementById('landlordCardsArea').classList.remove('minimized');
   renderRoles();
   clearAllPlayed();
   updateScoreDisplay();
@@ -698,6 +790,9 @@ function assignLandlord(pi) {
   renderLandlordCards(true);
   SFX.landlordReveal();
   setTimeout(() => {
+    // 底牌缩小到右上角
+    const zone = document.getElementById('landlordCardsArea');
+    zone.classList.add('minimized');
     renderRoles();
     if (pi===0) renderPlayerCards(); else renderAICards();
     updateScoreDisplay();
@@ -722,11 +817,28 @@ function nextTurn() {
   const pi = G.currentTurn;
 
   if (pi === 0) {
+    // 托管模式：自动由AI代打
+    if (autoPlay) {
+      showActionBtns(false);
+      showTurnTip('托管出牌中...');
+      setTimeout(() => doAITurn(0), 500 + Math.random()*300);
+      return;
+    }
     showActionBtns(true);
+    // 检查是否有牌可以出，如果没有则自动提示
+    const lastForPlayer = G.lastPlay && G.lastPlay.playerIndex!==0 ? G.lastPlay : null;
+    if (lastForPlayer) {
+      const hint = getHint(G.players[0].cards, lastForPlayer);
+      if (!hint) {
+        showTurnTip('没有牌能打过，自动不出');
+        setTimeout(doPassAction, 800);
+        return;
+      }
+    }
     showTurnTip('轮到你出牌');
     startTurnTimer(() => {
-      const lastForPlayer = G.lastPlay && G.lastPlay.playerIndex!==0 ? G.lastPlay : null;
-      if (lastForPlayer) {
+      const lastForPlayer2 = G.lastPlay && G.lastPlay.playerIndex!==0 ? G.lastPlay : null;
+      if (lastForPlayer2) {
         doPassAction();
       } else {
         const hint = getHint(G.players[0].cards, null);
@@ -780,7 +892,7 @@ function executePlay(pi, play) {
     SFX.pass();
     showThink(pi, '不出');
     if (pi!==0) document.getElementById(idMap[pi]).innerHTML = '<div class="pass-tip">不出</div>';
-    document.getElementById('centerPlayed').innerHTML       = '<div class="pass-tip">不出</div>';
+    // 不出时保留中央上次出牌的展示，只更新文字信息
     document.getElementById('centerPlayedWho').textContent  = `${G.players[pi].name} 不出`;
     showTurnTip(`${G.players[pi].name} 不出`);
   } else {
@@ -1173,8 +1285,16 @@ function escHtml(str) {
 }
 
 // ─── 网络消息处理 ─────────────────────────────────────────
+let lobbyRefreshTimer = null;
+
 Network.onMessage(msg => {
   if (!msg) return;
+  // 其他标签页修改了 localStorage，自动刷新大厅
+  if (msg.type==='STORAGE_CHANGED') {
+    if (document.getElementById('lobbyScreen').classList.contains('active'))
+      refreshRoomList();
+    return;
+  }
   if (msg.type==='ROOM_UPDATE' && msg.room) {
     if (currentRoom && msg.room.id===currentRoom.id) {
       currentRoom = msg.room;
@@ -1231,6 +1351,15 @@ document.getElementById('multiBtn').addEventListener('click', () => {
   Network.init(myPlayerName);
   refreshRoomList();
   showScreen('lobbyScreen');
+  // 进入大厅后每2秒自动刷新房间列表
+  clearInterval(lobbyRefreshTimer);
+  lobbyRefreshTimer = setInterval(() => {
+    if (document.getElementById('lobbyScreen').classList.contains('active')) {
+      refreshRoomList();
+    } else {
+      clearInterval(lobbyRefreshTimer);
+    }
+  }, 2000);
 });
 document.getElementById('ruleBtn').addEventListener('click', () => {
   SFX.init(); SFX.click(); showScreen('ruleScreen');
@@ -1288,6 +1417,23 @@ document.getElementById('quitBtn').addEventListener('click', () => {
 document.getElementById('muteBtn').addEventListener('click', () => {
   const muted = SFX.toggleMute();
   document.getElementById('muteBtn').textContent = muted ? '🔇' : '🔊';
+});
+
+// 托管按钮
+document.getElementById('autoPlayBtn').addEventListener('click', () => {
+  SFX.click();
+  autoPlay = !autoPlay;
+  const btn = document.getElementById('autoPlayBtn');
+  btn.textContent = autoPlay ? '🎮' : '🤖';
+  btn.title = autoPlay ? '取消托管' : '托管';
+  btn.style.background = autoPlay ? 'rgba(245,197,24,0.4)' : '';
+  showTurnTip(autoPlay ? '已开启托管，AI代打' : '已取消托管');
+  // 如果当前轮到玩家且开启托管，立刻让AI接管
+  if (autoPlay && G.phase === 'play' && G.currentTurn === 0) {
+    clearTurnTimer();
+    showActionBtns(false);
+    setTimeout(() => doAITurn(0), 400);
+  }
 });
 
 // 叫地主

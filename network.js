@@ -54,6 +54,14 @@ const Network = (() => {
       }
       if (onMessageCb) onMessageCb(msg);
     };
+
+    // 监听其他标签页的 localStorage 变更（跨标签同步）
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEY) {
+        // 通知房间列表刷新
+        if (onMessageCb) onMessageCb({ type: 'STORAGE_CHANGED' });
+      }
+    });
   }
 
   function broadcast(msg) {
